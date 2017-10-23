@@ -1,17 +1,20 @@
-import {app, Menu, shell, dialog} from 'electron';
-import settings from 'electron-settings';
+import {app, Menu, shell, ipcMain, Notification} from 'electron';
 
-const signInForUpdates = {
-  label: 'Sign up for updates',
-  click: () => shell.openExternal('http://eepurl.com/ch90_1')
-};
+import {checkForUpdates} from './auto-updater';
 
-function changeOutputDestination() {
-  const location = dialog.showOpenDialog({properties: ['openDirectory']});
-  if (location) {
-    settings.set('output-destination', location[0]);
+const checkForUpdatesItem = {
+  label: 'Check for updates',
+  click(item) {
+    item.enabled = false;
+    checkForUpdates(() => {
+      // This will be called if no update is available
+      (new Notification({
+        title: 'No updates available!',
+        body: 'You will automatically receive updates as soon as they are available 🤗'
+      })).show();
+    });
   }
-}
+};
 
 const cogMenu = [
   {
@@ -21,19 +24,22 @@ const cogMenu = [
     type: 'separator'
   },
   {
-    label: 'Change default output destination',
-    click: () => changeOutputDestination()
+    label: 'Preferences…',
+    accelerator: 'Cmd+,',
+    click() {
+      app.kap.openPrefsWindow();
+    }
   },
   {
     type: 'separator'
   },
-  signInForUpdates,
+  checkForUpdatesItem,
   {
     type: 'separator'
   },
   {
     role: 'quit',
-    id: 'quit'
+    accelerator: 'Cmd+Q'
   }
 ];
 
@@ -47,7 +53,17 @@ const applicationMenu = [
       {
         type: 'separator'
       },
-      signInForUpdates,
+      {
+        label: 'Preferences…',
+        accelerator: 'Cmd+,',
+        click() {
+          app.kap.openPrefsWindow();
+        }
+      },
+      checkForUpdatesItem,
+      {
+        type: 'separator'
+      },
       {
         label: 'Contribute',
         click: () => shell.openExternal('https://github.com/wulkano/kap')
@@ -93,9 +109,21 @@ const applicationMenu = [
         type: 'separator'
       },
       {
+        type: 'separator'
+      },
+      {
         label: 'Close',
         accelerator: 'CmdOrCtrl+W',
-        role: 'close'
+        click(item, focusedWindow) {
+          if (focusedWindow) {
+            if (focusedWindow === app.kap.editorWindow) {
+              ipcMain.emit('close-editor-window');
+              return;
+            }
+
+            focusedWindow.hide();
+          }
+        }
       }
     ]
   },
